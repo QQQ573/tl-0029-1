@@ -9,9 +9,24 @@ export interface FoodConfig {
   shape: 'circle' | 'rect' | 'triangle';
 }
 
+export type RuleCheckField = 
+  | { foodId_eq: FoodType }
+  | { foodId_not: FoodType }
+  | { foodId_in: FoodType[] }
+  | { timeOfDay_eq: TimeOfDay }
+  | { temperatureRange: { min: number; max: number } };
+
+export type RuleCheckCondition = Partial<{
+  foodId_eq: FoodType;
+  foodId_not: FoodType;
+  foodId_in: FoodType[];
+  timeOfDay_eq: TimeOfDay;
+  temperatureRange: { min: number; max: number };
+}>;
+
 export interface CageRule {
   description: string;
-  check: (context: RuleCheckContext) => boolean;
+  check: RuleCheckCondition;
   penalty: number;
   penaltyReason: string;
 }

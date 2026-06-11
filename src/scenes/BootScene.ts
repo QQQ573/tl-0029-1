@@ -6,7 +6,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.json('level1', 'levels/level1.json');
+    this.load.json('level1', '/levels/level1.json');
 
     const progress = this.add.graphics();
     const width = this.scale.width;

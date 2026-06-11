@@ -11,9 +11,11 @@ type ActiveTaskState = {
 
 export class GameScene extends Phaser.Scene {
   private levelConfig!: LevelConfig;
-  private player!: Phaser.Physics.Arcade.Sprite;
+  private player!: Phaser.GameObjects.Container;
+  private playerBody!: Phaser.Physics.Arcade.Body;
   private playerSpeed: number = 280;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private wasdKeys!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private camera!: Phaser.Cameras.Scene2D.Camera;
   private worldWidth: number = 1400;
   private worldHeight: number = 720;
@@ -21,7 +23,7 @@ export class GameScene extends Phaser.Scene {
   private welfareScore: number = 100;
   private maxScore: number = 100;
   private gameTimeElapsed: number = 0;
-  private currentGameHour: number = 0;
+  private currentGameHour: number = 8;
   private schedule: ScheduleTask[] = [];
   private mistakes: MistakeRecord[] = [];
   private completedTasksCount: number = 0;
@@ -72,18 +74,32 @@ export class GameScene extends Phaser.Scene {
     this.createMovementZones();
 
     this.cursors = this.input.keyboard!.createCursorKeys();
+    this.wasdKeys = this.input.keyboard!.addKeys('W,A,S,D') as unknown as { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
+
+    this.currentGameHour = this.levelConfig.startHour;
+    this.gameTimeElapsed = 0;
 
     this.time.delayedCall(1000, () => this.showNextHintCard());
   }
 
   update(_time: number, delta: number): void {
     if (this.isPaused || this.gameEnded) return;
+    if (!this.levelConfig) return;
 
-    this.updateGameTime(delta);
+    const clampedDelta = Math.min(delta, 50);
+    this.updateGameTime(clampedDelta);
     this.updatePlayerMovement();
     this.updateTaskAvailability();
     this.updateHUD();
     this.checkProximityTasks();
+
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.space!) && !this.activeTask && this.lastPromptCageId) {
+      const cage = this.levelConfig.cages.find(c => c.id === this.lastPromptCageId);
+      const task = this.findAvailableTaskForCage(this.lastPromptCageId);
+      if (cage && task) {
+        this.startTask(task, cage);
+      }
+    }
 
     if (this.gameTimeElapsed >= this.levelConfig.gameDurationMinutes * 60) {
       this.endGame(true);
@@ -220,6 +236,12 @@ export class GameScene extends Phaser.Scene {
 
     container.add([g, roof, animalTxt, nameBg, nameTxt, bowl]);
     container.setName(`cage_${cage.id}`);
+    container.setSize(240, 280);
+    container.setDepth(10);
+    container.setInteractive({ useHandCursor: true });
+    container.on('pointerdown', () => {
+      this.movePlayerToX(cage.position.x - 50);
+    });
 
     this.cages.set(cage.id, { config: cage, container, graphics: g });
   }
@@ -227,9 +249,8 @@ export class GameScene extends Phaser.Scene {
   // ==================== 玩家创建 ====================
   private createPlayer(): void {
     const startX = this.levelConfig.cages[0].position.x - 50;
-    this.player = this.physics.add.sprite(startX, 560, '');
-    this.player.setCollideWorldBounds(true);
-    this.player.setDisplaySize(44, 64);
+    this.player = this.add.container(startX, 550);
+    this.player.setDepth(80);
 
     const body = this.add.graphics();
     body.fillStyle(0x2563eb, 1);
@@ -237,8 +258,8 @@ export class GameScene extends Phaser.Scene {
     body.fillStyle(0xfbbf24, 1);
     body.fillCircle(0, -24, 16);
     body.fillStyle(0x000000, 1);
-    body.fillCircle(-5, -26, 2);
-    body.fillCircle(5, -26, 2);
+    body.fillCircle(-5, -26, 2.5);
+    body.fillCircle(5, -26, 2.5);
     body.lineStyle(2, 0x000000, 1);
     body.beginPath();
     body.arc(0, -20, 5, 0, Math.PI);
@@ -248,13 +269,24 @@ export class GameScene extends Phaser.Scene {
     body.fillRoundedRect(4, 28, 12, 20, 3);
     body.fillStyle(0x22c55e, 1);
     body.fillRoundedRect(-12, -50, 24, 8, 4);
+    body.fillStyle(0xfbbf24, 1);
+    body.fillRoundedRect(-6, -58, 12, 10, 2);
 
-    this.player.texture = this.textures.createCanvas('player', 100, 100)!;
-    body.generateTexture('player', 100, 100);
-    body.destroy();
-    this.player.setTexture('player');
+    const outline = this.add.graphics();
+    outline.lineStyle(2, 0xffffff, 0.8);
+    outline.strokeRoundedRect(-19, -9, 38, 42, 6);
 
-    this.camera.startFollow(this.player, true, 0.08, 0.08);
+    this.player.add([body, outline]);
+    this.player.setSize(44, 80);
+
+    this.physics.add.existing(this.player);
+    this.playerBody = this.player.body as Phaser.Physics.Arcade.Body;
+    this.playerBody.setCollideWorldBounds(true);
+    this.playerBody.setSize(40, 70);
+    this.playerBody.setOffset(-20, -35);
+
+    this.camera.startFollow(this.player, false, 0.1, 0.1, 0, 30);
+    this.camera.setFollowOffset(0, 0);
   }
 
   // ==================== HUD 创建 ====================
@@ -300,13 +332,16 @@ export class GameScene extends Phaser.Scene {
       dot.strokeCircle(mx, 41, 16);
       dot.setScrollFactor(0).setDepth(101);
 
+      const hitArea = this.add.zone(mx, 41, 36, 36);
+      hitArea.setScrollFactor(0).setDepth(103);
+      hitArea.setInteractive({ useHandCursor: true });
+      hitArea.on('pointerdown', () => {
+        this.movePlayerToX(cage.position.x - 50);
+      });
+
       const label = this.add.text(mx, 41, cage.animalEmoji, {
         fontSize: '18px'
       }).setOrigin(0.5).setScrollFactor(0).setDepth(102);
-      label.setInteractive({ useHandCursor: true });
-      label.on('pointerdown', () => {
-        this.movePlayerToX(cage.position.x - 50);
-      });
     });
   }
 
@@ -327,10 +362,22 @@ export class GameScene extends Phaser.Scene {
 
   private movePlayerToX(targetX: number): void {
     if (this.activeTask) return;
+    const clampedX = Phaser.Math.Clamp(targetX, 50, this.worldWidth - 50);
+
+    if (this.playerBody) {
+      this.playerBody.setVelocity(0);
+    }
+
+    if (clampedX < this.player.x) {
+      this.player.setScale(-1, 1);
+    } else if (clampedX > this.player.x) {
+      this.player.setScale(1, 1);
+    }
+
     this.tweens.add({
       targets: this.player,
-      x: targetX,
-      duration: Math.abs(targetX - this.player.x) / this.playerSpeed * 1000,
+      x: clampedX,
+      duration: Math.abs(clampedX - this.player.x) / this.playerSpeed * 1000,
       ease: 'Linear'
     });
   }
@@ -356,25 +403,27 @@ export class GameScene extends Phaser.Scene {
   // ==================== 玩家移动 ====================
   private updatePlayerMovement(): void {
     if (this.activeTask) {
-      this.player.setVelocity(0);
+      this.playerBody.setVelocity(0);
       return;
     }
 
     let vx = 0;
-    if (this.cursors.left!.isDown) vx = -this.playerSpeed;
-    if (this.cursors.right!.isDown) vx = this.playerSpeed;
+    if (this.cursors.left!.isDown || this.wasdKeys.A.isDown) vx = -this.playerSpeed;
+    if (this.cursors.right!.isDown || this.wasdKeys.D.isDown) vx = this.playerSpeed;
 
-    this.player.setVelocityX(vx);
+    this.playerBody.setVelocityX(vx);
 
-    if (vx < 0) this.player.setFlipX(true);
-    else if (vx > 0) this.player.setFlipX(false);
+    if (vx < 0) this.player.setScale(-1, 1);
+    else if (vx > 0) this.player.setScale(1, 1);
   }
 
   // ==================== 任务系统 ====================
   private updateTaskAvailability(): void {
+    if (!this.levelConfig) return;
+
     this.schedule.forEach(task => {
       if (task.completed) return;
-      const timeDiff = Math.abs(this.currentGameHour - task.scheduledTime);
+      const timeDiff = this.currentGameHour - task.scheduledTime;
       const windowHours = task.windowMinutes / 60;
       if (timeDiff > windowHours * 1.5) {
         task.completed = true;
@@ -395,7 +444,7 @@ export class GameScene extends Phaser.Scene {
 
     for (const cage of this.levelConfig.cages) {
       const dist = Math.abs(this.player.x - cage.position.x);
-      if (dist < 80) {
+      if (dist < 120) {
         const availableTask = this.findAvailableTaskForCage(cage.id);
         if (availableTask) {
           this.showTaskPrompt(cage, availableTask);
@@ -456,12 +505,6 @@ export class GameScene extends Phaser.Scene {
     c.on('pointerdown', () => this.startTask(task, cage));
 
     this.taskPrompt = c;
-
-    this.input.keyboard!.once('keydown-SPACE', () => {
-      if (this.lastPromptCageId === cage.id && !this.activeTask) {
-        this.startTask(task, cage);
-      }
-    });
   }
 
   private hideTaskPrompt(): void {
@@ -495,8 +538,8 @@ export class GameScene extends Phaser.Scene {
   private showTaskPanel(): void {
     if (!this.activeTask) return;
     const { cage, type } = this.activeTask;
-    const cx = this.camera.midPoint.x;
-    const cy = this.camera.midPoint.y;
+    const cx = this.scale.width / 2;
+    const cy = this.scale.height / 2;
 
     this.taskPanel = this.add.container(cx, cy);
     this.taskPanel.setDepth(200);
@@ -504,7 +547,7 @@ export class GameScene extends Phaser.Scene {
 
     const dim = this.add.graphics();
     dim.fillStyle(0x000000, 0.55);
-    dim.fillRect(-this.scale.width / 2, -this.scale.height / 2, this.scale.width, this.scale.height);
+    dim.fillRect(-cx, -cy, this.scale.width, this.scale.height);
     dim.setScrollFactor(0);
 
     const panel = this.add.graphics();
@@ -757,11 +800,16 @@ export class GameScene extends Phaser.Scene {
     c.setSize(50, 70);
     c.setInteractive({ useHandCursor: true, draggable: true });
     c.setName(`food_${food.id}`);
+    c.setData('origX', x);
+    c.setData('origY', y);
 
     this.input.setDraggable(c);
     c.on('drag', (_p: Phaser.Input.Pointer, dx: number, dy: number) => {
-      c.x = dx;
-      c.y = dy;
+      const feedArea = c.parentContainer as Phaser.GameObjects.Container;
+      const point = new Phaser.Geom.Point(dx, dy);
+      feedArea.getLocalPoint(point, point);
+      c.x = point.x;
+      c.y = point.y;
       this.dragFood = { item: c, foodConfig: food };
     });
     c.on('dragend', () => {
@@ -806,19 +854,15 @@ export class GameScene extends Phaser.Scene {
     const bowl = feedArea.getByName('dropBowl') as Phaser.GameObjects.Container;
     if (!bowl) { this.dragFood = null; return; }
 
-    const bowlWorld = bowl.getWorldTransformMatrix();
-    const bx = bowlWorld.tx, by = bowlWorld.ty;
-    const itemWorld = item.getWorldTransformMatrix();
-    const ix = itemWorld.tx, iy = itemWorld.ty;
-    const dist = Phaser.Math.Distance.Between(ix, iy, bx, by);
+    const dist = Phaser.Math.Distance.Between(item.x, item.y, bowl.x, bowl.y);
 
-    if (dist < 70) {
+    if (dist < 80) {
       this.validateFeedChoice(foodConfig);
     } else {
       this.tweens.add({
         targets: item,
-        x: item.getData('origX') || item.x,
-        y: item.getData('origY') || item.y,
+        x: item.getData('origX'),
+        y: item.getData('origY'),
         duration: 250
       });
     }
@@ -835,30 +879,42 @@ export class GameScene extends Phaser.Scene {
     let penalty = 0;
     let reason = '';
 
-    const brokenRules = cage.rules.filter(r => {
-      const check: Record<string, unknown> = r.check as unknown as Record<string, unknown>;
-      let ruleBroken = false;
-      if (check.foodId_eq !== undefined && check.foodId_eq !== food.id) ruleBroken = true;
-      if (check.foodId_not !== undefined && check.foodId_not === food.id) ruleBroken = true;
-      if (check.foodId_in instanceof Array && !check.foodId_in.includes(food.id)) ruleBroken = true;
-      if (check.timeOfDay_eq !== undefined) {
-        if (check.timeOfDay_eq !== timeOfDay) ruleBroken = true;
-      }
-      if (ruleBroken) {
-        penalty = Math.max(penalty, r.penalty);
-        reason = r.penaltyReason;
-      }
-      return ruleBroken;
-    });
+    for (const rule of cage.rules) {
+      const check = rule.check;
+      let ruleApplies = true;
 
-    if (task.foodId && food.id !== task.foodId && brokenRules.length === 0) {
-      isCorrect = false;
-      penalty = Math.max(penalty, 6);
-      reason = `未按时间表要求投喂${FOODS.find(f => f.id === task.foodId)?.name}`;
+      if (check.timeOfDay_eq !== undefined) {
+        ruleApplies = check.timeOfDay_eq === timeOfDay;
+      }
+
+      if (!ruleApplies) continue;
+
+      let ruleBroken = false;
+
+      if (check.foodId_eq !== undefined && check.foodId_eq !== food.id) {
+        ruleBroken = true;
+      }
+      if (check.foodId_not !== undefined && check.foodId_not === food.id) {
+        ruleBroken = true;
+      }
+      if (check.foodId_in instanceof Array && !check.foodId_in.includes(food.id)) {
+        ruleBroken = true;
+      }
+
+      if (ruleBroken) {
+        isCorrect = false;
+        if (rule.penalty > penalty) {
+          penalty = rule.penalty;
+          reason = rule.penaltyReason;
+        }
+      }
     }
 
-    if (brokenRules.length > 0) {
+    if (task.foodId && food.id !== task.foodId && isCorrect) {
       isCorrect = false;
+      penalty = Math.max(penalty, 6);
+      const correctFood = FOODS.find(f => f.id === task.foodId);
+      reason = `未按时间表要求投喂${correctFood?.name || '指定食物'}`;
     }
 
     if (!isCorrect) {
@@ -905,7 +961,7 @@ export class GameScene extends Phaser.Scene {
     const btnPlus = this.createTempButton(140, 110, '+', () => this.adjustTemp(1));
     area.add([btnMinus, btnPlus]);
 
-    const confirmBtn = this.createConfirmButton(0, -130, '✅ 确认记录', 0x22c55e);
+    const confirmBtn = this.createConfirmButton(0, 170, '✅ 确认记录', 0x22c55e);
     confirmBtn.on('pointerdown', () => this.validateRecordTemp());
     area.add(confirmBtn);
 
@@ -1011,10 +1067,10 @@ export class GameScene extends Phaser.Scene {
     const w = 200, h = 46;
     g.fillStyle(color, 1);
     g.lineStyle(3, 0xffffff, 1);
-    g.fillRoundedRect(-w / 2, 400 - 250 + y + 250 - 46 / 2, w, h, 10);
-    g.strokeRoundedRect(-w / 2, 400 - 250 + y + 250 - 46 / 2, w, h, 10);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, 10);
+    g.strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
 
-    const t = this.add.text(0, y + 400, text, {
+    const t = this.add.text(0, 0, text, {
       fontSize: '20px',
       color: '#ffffff',
       fontStyle: 'bold'
