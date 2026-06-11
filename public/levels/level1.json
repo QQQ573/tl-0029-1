@@ -1,0 +1,159 @@
+{
+  "id": "level_1",
+  "name": "第一关：实习上岗日",
+  "description": "欢迎来到珍奇动物园！今天是你实习的第一天，请按照时间表完成所有笼舍的日常工作。",
+  "gameDurationMinutes": 8,
+  "realTimeMultiplier": 60,
+  "startHour": 8,
+  "minWelfareScore": 60,
+  "cages": [
+    {
+      "id": "cage_monkey",
+      "name": "1号笼舍",
+      "animalName": "川金丝猴",
+      "animalEmoji": "🐒",
+      "color": 16766720,
+      "accentColor": 12829635,
+      "position": { "x": 150, "y": 400 },
+      "acceptedFoods": ["fresh_fruit", "nuts", "leaves"],
+      "specialHint": "川金丝猴拒食隔夜水果，会严重影响健康！",
+      "rules": [
+        {
+          "description": "禁止投喂隔夜水果",
+          "check": { "foodId_not": "overnight_fruit" },
+          "penalty": 15,
+          "penaltyReason": "给川金丝猴投喂了隔夜水果！"
+        }
+      ]
+    },
+    {
+      "id": "cage_alligator",
+      "name": "2号笼舍",
+      "animalName": "扬子鳄",
+      "animalEmoji": "🐊",
+      "color": 4587777,
+      "accentColor": 2656924,
+      "position": { "x": 350, "y": 400 },
+      "acceptedFoods": ["live_fish", "meat"],
+      "specialHint": "扬子鳄只在下午接受活体投喂，上午请投喂切块肉。",
+      "rules": [
+        {
+          "description": "下午必须投喂活鱼",
+          "check": { "timeOfDay_eq": "afternoon", "foodId_eq": "live_fish" },
+          "penalty": 12,
+          "penaltyReason": "扬子鳄下午只吃活鱼！"
+        },
+        {
+          "description": "上午必须投喂切块肉",
+          "check": { "timeOfDay_eq": "morning", "foodId_eq": "meat" },
+          "penalty": 12,
+          "penaltyReason": "扬子鳄上午只吃切块肉！"
+        }
+      ]
+    },
+    {
+      "id": "cage_panda",
+      "name": "3号笼舍",
+      "animalName": "大熊猫",
+      "animalEmoji": "🐼",
+      "color": 16119285,
+      "accentColor": 10526880,
+      "position": { "x": 550, "y": 400 },
+      "acceptedFoods": ["bamboo", "fresh_fruit"],
+      "specialHint": "大熊猫以竹子为主食，可少量搭配新鲜水果。",
+      "rules": [
+        {
+          "description": "必须投喂竹子或新鲜水果",
+          "check": { "foodId_in": ["bamboo", "fresh_fruit"] },
+          "penalty": 10,
+          "penaltyReason": "给大熊猫投喂了错误的食物！"
+        }
+      ]
+    },
+    {
+      "id": "cage_tiger",
+      "name": "4号笼舍",
+      "animalName": "东北虎",
+      "animalEmoji": "🐅",
+      "color": 16751616,
+      "accentColor": 12517376,
+      "position": { "x": 750, "y": 400 },
+      "acceptedFoods": ["meat"],
+      "specialHint": "东北虎是纯肉食动物，只能投喂切块肉。",
+      "rules": [
+        {
+          "description": "只能投喂切块肉",
+          "check": { "foodId_eq": "meat" },
+          "penalty": 15,
+          "penaltyReason": "给东北虎投喂了错误的食物！"
+        }
+      ]
+    },
+    {
+      "id": "cage_parrot",
+      "name": "5号笼舍",
+      "animalName": "金刚鹦鹉",
+      "animalEmoji": "🦜",
+      "color": 16727808,
+      "accentColor": 10550296,
+      "position": { "x": 950, "y": 400 },
+      "acceptedFoods": ["nuts", "fresh_fruit"],
+      "specialHint": "金刚鹦鹉喜食坚果和水果，温度需保持在25-28°C。",
+      "rules": [
+        {
+          "description": "必须投喂坚果或水果",
+          "check": { "foodId_in": ["nuts", "fresh_fruit"] },
+          "penalty": 8,
+          "penaltyReason": "给金刚鹦鹉投喂了错误的食物！"
+        }
+      ]
+    },
+    {
+      "id": "cage_giraffe",
+      "name": "6号笼舍",
+      "animalName": "长颈鹿",
+      "animalEmoji": "🦒",
+      "color": 15908793,
+      "accentColor": 11227462,
+      "position": { "x": 1150, "y": 400 },
+      "acceptedFoods": ["leaves", "fresh_fruit"],
+      "specialHint": "长颈鹿以树叶为主，可搭配新鲜水果，温度宜20-24°C。",
+      "rules": [
+        {
+          "description": "必须投喂树叶或水果",
+          "check": { "foodId_in": ["leaves", "fresh_fruit"] },
+          "penalty": 10,
+          "penaltyReason": "给长颈鹿投喂了错误的食物！"
+        }
+      ]
+    }
+  ],
+  "schedule": [
+    { "id": "t1", "cageId": "cage_monkey", "taskType": "clean", "scheduledTime": 8.2, "windowMinutes": 60, "completed": false },
+    { "id": "t2", "cageId": "cage_panda", "taskType": "clean", "scheduledTime": 8.4, "windowMinutes": 60, "completed": false },
+    { "id": "t3", "cageId": "cage_alligator", "taskType": "feed", "scheduledTime": 9.0, "windowMinutes": 30, "foodId": "meat", "completed": false },
+    { "id": "t4", "cageId": "cage_monkey", "taskType": "feed", "scheduledTime": 9.2, "windowMinutes": 30, "foodId": "fresh_fruit", "completed": false },
+    { "id": "t5", "cageId": "cage_parrot", "taskType": "record", "scheduledTime": 9.5, "windowMinutes": 60, "targetTemperature": 26, "temperatureTolerance": 2, "completed": false },
+    { "id": "t6", "cageId": "cage_tiger", "taskType": "feed", "scheduledTime": 10.0, "windowMinutes": 30, "foodId": "meat", "completed": false },
+    { "id": "t7", "cageId": "cage_panda", "taskType": "feed", "scheduledTime": 10.3, "windowMinutes": 30, "foodId": "bamboo", "completed": false },
+    { "id": "t8", "cageId": "cage_giraffe", "taskType": "clean", "scheduledTime": 10.8, "windowMinutes": 60, "completed": false },
+    { "id": "t9", "cageId": "cage_tiger", "taskType": "clean", "scheduledTime": 11.0, "windowMinutes": 60, "completed": false },
+    { "id": "t10", "cageId": "cage_giraffe", "taskType": "record", "scheduledTime": 11.5, "windowMinutes": 60, "targetTemperature": 22, "temperatureTolerance": 2, "completed": false },
+    { "id": "t11", "cageId": "cage_parrot", "taskType": "feed", "scheduledTime": 13.0, "windowMinutes": 30, "foodId": "nuts", "completed": false },
+    { "id": "t12", "cageId": "cage_alligator", "taskType": "feed", "scheduledTime": 13.5, "windowMinutes": 30, "foodId": "live_fish", "completed": false },
+    { "id": "t13", "cageId": "cage_giraffe", "taskType": "feed", "scheduledTime": 14.0, "windowMinutes": 30, "foodId": "leaves", "completed": false },
+    { "id": "t14", "cageId": "cage_monkey", "taskType": "feed", "scheduledTime": 14.5, "windowMinutes": 30, "foodId": "nuts", "completed": false },
+    { "id": "t15", "cageId": "cage_panda", "taskType": "record", "scheduledTime": 15.0, "windowMinutes": 60, "targetTemperature": 18, "temperatureTolerance": 3, "completed": false },
+    { "id": "t16", "cageId": "cage_parrot", "taskType": "clean", "scheduledTime": 15.3, "windowMinutes": 60, "completed": false }
+  ],
+  "hintCards": [
+    "📋 任务清单：清洁=点击3次污渍，投喂=拖拽正确食物，记录=输入温度数字",
+    "🐒 川金丝猴：绝不能喂隔夜水果！只能喂新鲜水果、坚果或嫩叶",
+    "🐊 扬子鳄：上午(8-12点)喂切块肉，下午(12-16点)喂活鱼",
+    "🐼 大熊猫：主食竹子，可搭配少量新鲜水果",
+    "🐅 东北虎：只吃切块肉，禁止其他食物",
+    "🦜 金刚鹦鹉：喜食坚果和水果，室温25-28°C",
+    "🦒 长颈鹿：主食树叶，可搭配新鲜水果，室温20-24°C",
+    "⏰ 关注时间表：错过任务时间窗口也会扣分！"
+  ]
+}
